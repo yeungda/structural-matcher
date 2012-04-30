@@ -1,19 +1,30 @@
 require 'rubygems'
 require 'unindent'
 
-def match(expectation, actual)
-  def match?(expectation, actual)
+class SimpleDataMatcher
+  def self.match(expectation, actual)
+    match = self.match?(expectation, actual)
+    if match
+      {:matches? => true}
+    else
+      {:matches? => false, :description => self.describe(expectation, actual)}
+    end
+  end
+
+  private
+
+  def self.match?(expectation, actual)
     if expectation == nil or actual == nil
       expectation == actual
     elsif expectation.class == Hash
       expectation.keys.map {|key|
         expectation_value = expectation[key]
         actual_value = actual[key]
-        match?(expectation_value, actual_value)
+        self.match?(expectation_value, actual_value)
       }.all? {|match| true == match}
     elsif expectation.class == Array
       (0..expectation.size).to_a.map {|index|
-        match?(expectation[index], actual[index])
+        self.match?(expectation[index], actual[index])
       }.all? {|match| true == match}
     elsif expectation.respond_to?(:match)
       expectation.match(actual) != nil
@@ -21,14 +32,41 @@ def match(expectation, actual)
       expectation == actual
     end
   end
-  description = <<-EOS.unindent
-  {
-   +:exactmatchstring => ""
-   -:exactmatchstring => "exactmatch"
-  }
-  EOS
-  {:matches? => match?(expectation, actual),
-   :description => description}
+
+  def self.describe(expectation, actual)
+    if expectation == nil or actual == nil
+      ""
+    elsif expectation.class == Hash
+      pairs = expectation.keys.map {|key|
+        expectation_value = expectation[key]
+        actual_value = actual[key]
+        match = self.match?(expectation_value, actual_value)
+        if match
+          " #{key.inspect} => #{expectation_value.inspect}"
+        else
+          "-#{key.inspect} => #{expectation_value.inspect}\n" +
+          " +#{key.inspect} => #{actual_value.inspect}"
+        end
+      }.join("\n  ")
+      "{\n #{pairs}\n}"
+    elsif expectation.class == Array
+      ""
+    elsif expectation.respond_to?(:match)
+      match = self.match?(expectation, actual)
+      if match
+        " #{expectation.inspect}"
+      else
+        "-#{expectation.inspect}\n+#{actual.inspect}"
+      end
+    else
+      match = self.match?(expectation, actual)
+      if match
+        " #{expectation.inspect}"
+      else
+        "-#{expectation.inspect}\n+#{actual.inspect}"
+      end
+    end
+  end
 end
 
 class MatcherTest
@@ -38,21 +76,39 @@ class MatcherTest
   end
 
   def expect(expected_data, actual_data, expected_result, expected_description=nil)
-    actual_result = match(expected_data, actual_data)
+    actual_result = SimpleDataMatcher.match(expected_data, actual_data)
     context = "when matching #{expected_data} with #{actual_data},"
     assert_equals(expected_result, actual_result[:matches?], context)
-    assert_equals(expected_description, actual_result[:description], context) unless expected_description.nil?
+    assert_equals(expected_description.rstrip.unindent, actual_result[:description], context) unless expected_description.nil?
   end
   
-  def test
-    examples = [
+  def examples
+    [
+      ["hello", "goodbye", false,
+        <<-EOS
+        -"hello"
+        +"goodbye"
+        EOS
+      ],
+      [1, 2, false,
+        <<-EOS
+        -1
+        +2
+        EOS
+      ],
+      [/xyz/, "abc", false,
+        <<-EOS
+        -/xyz/
+        +"abc"
+        EOS
+      ],
       [{}, {}, true, nil],
       [{:exactmatchstring => "exactmatch"}, {:exactmatchstring => "exactmatch"}, true],
       [{:exactmatchstring => ""}, {:exactmatchstring => "exactmatch"}, false,
-      <<-EOS.unindent
+      <<-EOS
       {
-       +:exactmatchstring => ""
-       -:exactmatchstring => "exactmatch"
+       -:exactmatchstring => ""
+       +:exactmatchstring => "exactmatch"
       }
       EOS
       ],
@@ -93,10 +149,14 @@ class MatcherTest
       ["exactmismatch","notexact", false],
       [/pattern/,"blah blah pattern blah blah", true]
     ]
+  end
+
+  def test
     examples.each {|example|
       expect(example[0], example[1], example[2], example[3])
     }
   end
 
 end
+
 MatcherTest.new.test
