@@ -1,5 +1,6 @@
 require 'rubygems'
 require 'unindent'
+require './structural_matcher.rb'
 
 class StructuralMatcherTest
 
@@ -45,7 +46,14 @@ class StructuralMatcherTest
       EOS
       ],
       [{:exactmatchinteger => 1}, {:exactmatchinteger => 1}, true],
-      [{:exactmatchinteger => 1}, {:exactmatchinteger => 2}, false],
+      [{:exactmatchinteger => 1}, {:exactmatchinteger => 2}, false, 
+      <<-EOS
+      {
+       -:exactmatchinteger => 1
+       +:exactmatchinteger => 2
+      }
+      EOS
+      ],
       [{}, {:anything => 'anything'}, true],
       [{:firstpart => 'something'}, 
        {:firstpart => 'something', :secondpart => 'anything'}, 
@@ -67,13 +75,34 @@ class StructuralMatcherTest
        true],
       [{:nestedmap => {:exactmatch => 'wrongvalue'}},
        {:nestedmap => {:anythingelse => 'anything'}},
-       false],
+       false,
+      <<-EOS
+      {
+       :nestedmap => {
+         -:exactmatch => "wrongvalue"
+       }
+      }
+      EOS
+      ],
       [{:equalarray => [1,2]},
        {:equalarray => [1,2]},
        true],
-      [{:mismatchingarray => [1]},
-       {:mismatchingarray => [1,2]},
-       false],
+      [{:containsitemsarray => [1]},
+       {:containsitemsarray => [1,2]},
+       true],
+      [{:mismatchingarray => [1,2]},
+       {:mismatchingarray => [1]},
+       false,
+      <<-EOS
+      {
+       :mismatchingarray => [
+         1
+        -2
+        +nil
+       ]
+      }
+      EOS
+      ],
       [{:arraywithpatternstring => [/hasthisinit/]},
        {:arraywithpatternstring => ["xxxxx hasthisinit xxxx"]},
        true],
