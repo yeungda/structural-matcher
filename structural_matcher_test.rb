@@ -17,6 +17,13 @@ class StructuralMatcherTest
   
   def examples
     [
+      [:hello, :goodbye, false,
+        <<-EOS
+         -:hello
+         +:goodbye
+        EOS
+      ],
+      [:hello, :hello, true],
       ["hello", "goodbye", false,
         <<-EOS
         -"hello"

@@ -23,7 +23,7 @@ class StructuralMatcher
       (0..expectation.size-1).to_a.map {|index|
         self.match?(expectation[index], actual[index])
       }.all? {|match| true == match}
-    elsif expectation.respond_to?(:match)
+    elsif expectation.class == Regexp
       expectation.match(actual) != nil
     else
       expectation == actual
@@ -62,7 +62,7 @@ class StructuralMatcher
         self.describe(expected_item, actual_item)
       }.join("\n")
       "[\n#{indent(items, indentation)}\n]"
-    elsif expectation.respond_to?(:match)
+    elsif expectation.class == Regexp
       match = self.match?(expectation, actual)
       if match
         " #{expectation.inspect}"
