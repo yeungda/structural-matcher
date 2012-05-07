@@ -20,7 +20,7 @@ class StructuralMatcher
         self.match?(expectation_value, actual_value)
       }.all? {|match| true == match}
     elsif expectation.class == Array
-      (0..expectation.size).to_a.map {|index|
+      (0..expectation.size-1).to_a.map {|index|
         self.match?(expectation[index], actual[index])
       }.all? {|match| true == match}
     elsif expectation.respond_to?(:match)
@@ -30,24 +30,38 @@ class StructuralMatcher
     end
   end
 
-  def self.describe(expectation, actual)
-    if expectation == nil or actual == nil
+  def self.describe(expectation, actual, indentation=0)
+    if expectation == nil
       ""
     elsif expectation.class == Hash
       pairs = expectation.keys.map {|key|
+        indentation = indentation + 1
         expectation_value = expectation[key]
         actual_value = actual[key]
-        match = self.match?(expectation_value, actual_value)
-        if match
-          " #{key.inspect} => #{expectation_value.inspect}"
+        if [Hash, Array].member? expectation_value.class
+          "#{key.inspect} => " + self.describe(expectation_value, actual_value, indentation)
         else
-          "-#{key.inspect} => #{expectation_value.inspect}\n" +
-          " +#{key.inspect} => #{actual_value.inspect}"
+          match = self.match?(expectation_value, actual_value)
+          if match
+            " #{key.inspect} => #{expectation_value.inspect}"
+          else
+            "-#{key.inspect} => #{expectation_value.inspect}" +
+            if actual.has_key? key
+              "\n+#{key.inspect} => #{actual_value.inspect}"
+            else
+              ""
+            end
+          end
         end
       }.join("\n  ")
-      "{\n #{pairs}\n}"
+      "{\n" + self.indent("#{pairs}", indentation) + "\n}"
     elsif expectation.class == Array
-      ""
+      items = (0..(expectation.size - 1)).to_a.map {|index|
+        expected_item = expectation[index]
+        actual_item = actual[index]
+        self.describe(expected_item, actual_item)
+      }.join("\n")
+      "[\n#{indent(items, indentation)}\n]"
     elsif expectation.respond_to?(:match)
       match = self.match?(expectation, actual)
       if match
@@ -63,5 +77,10 @@ class StructuralMatcher
         "-#{expectation.inspect}\n+#{actual.inspect}"
       end
     end
+  end
+
+  def self.indent(s, indentation)
+    spaces = ' ' * indentation
+    spaces + s.gsub("\n", "\n#{spaces}")
   end
 end
